@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Audita</title>
+<style>
+@font-face { font-family: Plex; src: url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2"); font-weight: 400; }
+@font-face { font-family: Plex; src: url(fonts/ibm-plex-sans-latin-500-normal.woff2) format("woff2"); font-weight: 500; }
+@font-face { font-family: Plex; src: url(fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2"); font-weight: 600; }
+@font-face { font-family: PlexMono; src: url(fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2"); font-weight: 400; }
+@font-face { font-family: PlexMono; src: url(fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2"); font-weight: 500; }
+
+:root {
+  --bg: #F4F2EC; --card: #FFFFFF; --sunk: #ECE9E0; --ink: #14201F; --muted: #5E6B69; --line: #DDD8CC;
+  --accent: #0E8C7F; --accent-soft: #D7EFEB; --on-accent: #FFFFFF; --warn: #B4561F; --warn-soft: #F7E3D6;
+  --ok: #2F7D4B; --meter: #0E8C7F; --meter-hot: #C9432B; --shadow: 0 1px 2px rgba(20, 32, 31, .06);
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #0F1517; --card: #172024; --sunk: #111a1d; --ink: #E6ECEA; --muted: #8FA09C; --line: #26343A;
+  --accent: #3FC1B0; --accent-soft: #163a36; --on-accent: #072320; --warn: #E08A4F; --warn-soft: #3a2416;
+  --ok: #6CC48C; --meter: #3FC1B0; --meter-hot: #F06A4F; --shadow: none;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 Plex, system-ui, sans-serif; }
+body { padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); }
+a { color: var(--accent); }
+.mono { font-family: PlexMono, ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+button { font: inherit; color: inherit; }
+
+/* ---------- top bar ---------- */
+.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 14px 16px 12px;
+  background: var(--bg); border-bottom: 1px solid var(--line); }
+.brand { flex: 1; min-width: 0; }
+.brand b { display: block; font-size: 20px; font-weight: 600; letter-spacing: .01em; }
+.brand span { display: block; font-size: 12px; color: var(--muted); }
+.conn { display: inline-flex; align-items: center; gap: 8px; max-width: 58%; padding: 7px 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--card); font-size: 13px; cursor: pointer; }
+.conn i { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.conn[data-st="1"] i { background: var(--warn); animation: blink 1s infinite; }
+.conn[data-st="2"] i { background: var(--ok); }
+.conn em { font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes blink { 50% { opacity: .25; } }
+
+/* ---------- layout ---------- */
+main { padding: 14px 14px 8px; max-width: 640px; margin: 0 auto; }
+.tab { display: none; }
+.tab.on { display: block; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 14px 12px; margin-bottom: 12px; box-shadow: var(--shadow); }
+.card h2 { margin: 0 0 10px; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.card p.note { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.row { display: flex; align-items: center; gap: 10px; }
+.grow { flex: 1; min-width: 0; }
+.offline main { opacity: .55; }
+.offline main .card.live { pointer-events: none; }
+
+/* segmented control */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; background: var(--sunk); border-radius: 11px; }
+.seg button { border: 0; background: transparent; padding: 9px 6px; border-radius: 8px; font-weight: 500; cursor: pointer; color: var(--muted); }
+.seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.seg.big button { padding: 14px 6px; font-size: 16px; }
+.seg.big button small { display: block; font-size: 11.5px; font-weight: 400; color: var(--muted); margin-top: 2px; }
+.seg.accent button.on { background: var(--accent); color: var(--on-accent); }
+.seg.accent button.on small { color: var(--on-accent); opacity: .85; }
+.seg.small button { padding: 6px 4px; font-size: 13px; }
+
+/* compare */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.compare button { border: 1px solid var(--line); background: var(--card); border-radius: 12px; padding: 14px 10px; text-align: left; cursor: pointer; }
+.compare button b { display: block; font-weight: 600; }
+.compare button span { font-size: 12.5px; color: var(--muted); }
+.compare button.on { border-color: var(--accent); background: var(--accent-soft); }
+.compare button.on.orig { border-color: var(--warn); background: var(--warn-soft); }
+
+/* volume */
+.vol { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.vol .v { font-size: 34px; font-weight: 500; }
+.vol .u { color: var(--muted); }
+.vol .hot { margin-left: auto; font-size: 12.5px; color: var(--warn); font-weight: 500; }
+input[type=range] { width: 100%; accent-color: var(--accent); height: 32px; }
+.step { width: 44px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); font-size: 20px; cursor: pointer; flex: none; }
+
+/* meters */
+.meter { display: grid; grid-template-columns: 54px 1fr 64px; align-items: center; gap: 10px; margin: 6px 0; font-size: 13px; }
+.meter .bar { height: 10px; border-radius: 5px; background: var(--sunk); overflow: hidden; position: relative; }
+.meter .bar i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--meter); border-radius: 5px; transition: width .15s linear; }
+.meter .bar i.hot { background: var(--meter-hot); }
+.meter .val { text-align: right; color: var(--muted); }
+.ticks { display: grid; grid-template-columns: 54px 1fr 64px; gap: 10px; font-size: 10.5px; color: var(--muted); }
+.ticks div { display: flex; justify-content: space-between; }
+
+/* detection list */
+.det { display: grid; grid-template-columns: 1fr; }
+.det div { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: baseline; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+.det div:first-child { border-top: 0; }
+.det .k { color: var(--muted); }
+.det .v { text-align: right; font-weight: 500; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); align-self: center; }
+.dot.ok { background: var(--accent); }
+.dot.warn { background: var(--warn); }
+
+/* blocks (tune) */
+.blk { padding: 10px 0; border-top: 1px solid var(--line); }
+.blk:first-of-type { border-top: 0; }
+.blk .t { font-weight: 500; }
+.blk .d { font-size: 12.5px; color: var(--muted); margin: 1px 0 8px; }
+.blk .now { font-size: 12px; color: var(--accent); font-weight: 500; margin-left: 6px; }
+
+/* headphones */
+.search { display: flex; gap: 8px; }
+.search input { flex: 1; min-width: 0; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font: inherit; }
+.btn { border: 1px solid var(--line); background: var(--card); padding: 10px 14px; border-radius: 10px; font-weight: 500; cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.danger { color: var(--warn); }
+.btn:disabled { opacity: .5; }
+.results { margin-top: 8px; max-height: 340px; overflow-y: auto; }
+.results button { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); background: transparent; padding: 10px 4px; cursor: pointer; }
+.results button:first-child { border-top: 0; }
+.results button b { font-weight: 500; display: block; }
+.results button span { font-size: 12.5px; color: var(--muted); }
+.empty { color: var(--muted); font-size: 13.5px; padding: 8px 0; }
+table.f { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+table.f th { text-align: right; font-weight: 500; color: var(--muted); font-size: 11.5px; padding: 4px 4px; }
+table.f th:first-child, table.f td:first-child { text-align: left; }
+table.f td { text-align: right; padding: 4px; border-top: 1px solid var(--line); }
+svg.curve { width: 100%; height: auto; display: block; margin-top: 8px; background: var(--sunk); border-radius: 10px; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.confirm { margin-top: 10px; padding: 10px; border-radius: 10px; background: var(--warn-soft); font-size: 13.5px; }
+
+/* device */
+dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 14px; }
+dl.kv dt { color: var(--muted); }
+dl.kv dd { margin: 0; text-align: right; }
+.about { font-size: 13px; color: var(--muted); }
+.about a { color: var(--accent); }
+
+/* bottom tabs */
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(4, 1fr);
+  background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+nav.tabs button { border: 0; background: transparent; padding: 8px 4px 9px; font-size: 11.5px; color: var(--muted); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+nav.tabs button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+nav.tabs button.on { color: var(--accent); font-weight: 600; }
+
+#toast { position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 9; max-width: 92%;
+  background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 10px; font-size: 13.5px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+#toast.on { opacity: .95; }
+.banner { display: none; margin-bottom: 12px; padding: 12px 14px; border-radius: 12px; background: var(--warn-soft); font-size: 13.5px; }
+.offline .banner { display: block; }
+.banner .btn { margin-top: 8px; }
+</style>
+</head>
+<body class="offline">
+
+<header class="top">
+  <div class="brand"><b>Audita</b><span>Listening processor for transcription</span></div>
+  <button class="conn" id="conn" data-st="0" title="Connection"><i></i><em id="connTxt">Not connected</em></button>
+</header>
+
+<main>
+  <div class="banner" id="banner"><span id="bannerTxt">Not connected to Audita.</span><br>
+    <button class="btn" id="retry">Search again</button></div>
+
+  <!-- ================= LISTEN ================= -->
+  <section class="tab on" id="tab-listen">
+    <div class="card live">
+      <h2>Intensity</h2>
+      <div class="seg big accent" id="level">
+        <button data-v="0">Low<small>Gentle</small></button>
+        <button data-v="1">Medium<small>Default</small></button>
+        <button data-v="2">High<small>Strong</small></button>
+      </div>
+      <p class="note">Everything else adapts by itself to the recording. Higher intensity removes more noise but can make voices sound processed.</p>
+    </div>
+
+    <div class="card live">
+      <h2>Compare</h2>
+      <div class="compare" id="bypass">
+        <button data-v="0"><b>Processed</b><span>What Audita does</span></button>
+        <button data-v="1" class="orig"><b>Original</b><span>Bypass, untouched</span></button>
+      </div>
+    </div>
+
+    <div class="card live">
+      <h2>Headphone volume</h2>
+      <div class="vol"><span class="v mono" id="volV">–</span><span class="u">dB</span><span class="hot" id="volHot" hidden>Loud: above 0 dB</span></div>
+      <div class="row">
+        <button class="step" id="volDn" aria-label="Volume down">−</button>
+        <input class="grow" type="range" id="vol" min="-60" max="12" step="1" value="-30">
+        <button class="step" id="volUp" aria-label="Volume up">+</button>
+      </div>
+      <div class="meter"><span>Input</span><div class="bar"><i id="mIn"></i></div><span class="val mono" id="mInV">–</span></div>
+      <div class="meter"><span>Output</span><div class="bar"><i id="mOut"></i></div><span class="val mono" id="mOutV">–</span></div>
+      <div class="ticks"><span></span><div><span>−60</span><span>−40</span><span>−20</span><span>0 dBFS</span></div><span></span></div>
+      <p class="note">The limiter on the headphone output is always on (ceiling <span class="mono" id="ceilNote">–</span> dBFS<span id="grNote"></span>).</p>
+    </div>
+
+    <div class="card">
+      <h2>What Audita detects</h2>
+      <div class="det" id="det"></div>
+    </div>
+  </section>
+
+  <!-- ================= TUNE ================= -->
+  <section class="tab" id="tab-tune">
+    <div class="card live">
+      <h2>Channels</h2>
+      <div class="seg" id="ch">
+        <button data-v="auto">Follow the source</button>
+        <button data-v="mono">Force mono</button>
+      </div>
+      <p class="note">Following the source, phone calls come out mono in both ears and stereo room recordings stay stereo.</p>
+    </div>
+
+    <div class="card live">
+      <h2>Noise reduction engine</h2>
+      <div class="seg" id="dn">
+        <button data-v="1">Neural</button>
+        <button data-v="0">Classic</button>
+        <button data-v="2">Both</button>
+      </div>
+      <p class="note">Neural (RNNoise) gave the best results in our tests. Classic is a statistical spectral filter; Both keeps the stronger of the two at each frequency.</p>
+    </div>
+
+    <div class="card live">
+      <h2>Processing blocks</h2>
+      <div id="blocks"></div>
+      <p class="note">Auto lets Audita decide from the recording. On forces a block even when it is not detected; Off removes it.</p>
+    </div>
+
+    <div class="card live">
+      <h2>Bandwidth extension envelope</h2>
+      <div class="seg" id="bweenv">
+        <button data-v="1">Learned</button>
+        <button data-v="0">Fixed slope</button>
+      </div>
+      <p class="note">How loud the rebuilt 3.4–7 kHz band is: estimated from the voice (learned on wideband speech) or a fixed −12 dB/octave slope.</p>
+    </div>
+
+    <div class="card live">
+      <h2>Output ceiling</h2>
+      <div class="vol"><span class="v mono" id="ceilV">–</span><span class="u">dBFS</span></div>
+      <input type="range" id="ceil" min="-30" max="0" step="1" value="-3">
+      <p class="note">Maximum level the limiter lets through to the headphones. Lower is safer for the ears.</p>
+    </div>
+
+    <div class="card live">
+      <h2>USB return to the computer</h2>
+      <div class="seg" id="ret">
+        <button data-v="proc">Processed</button>
+        <button data-v="out">Headphone mix</button>
+      </div>
+      <p class="note">What the computer records from Audita: the processed voice before the volume, or exactly what you hear.</p>
+    </div>
+  </section>
+
+  <!-- ================= HEADPHONES ================= -->
+  <section class="tab" id="tab-phones">
+    <div class="card live">
+      <h2>Headphone correction</h2>
+      <div id="cur"></div>
+    </div>
+
+    <div class="card">
+      <h2>Find your headphones</h2>
+      <div class="search"><input id="q" type="search" placeholder="Model, e.g. Sennheiser HD 600" autocomplete="off" enterkeyhint="search"></div>
+      <div class="results" id="res"></div>
+      <p class="note" id="idxNote">Profiles from the <a href="https://github.com/jaakkopasanen/AutoEq">AutoEq</a> database.</p>
+    </div>
+
+    <div class="card" id="prev" hidden>
+      <h2>Preview</h2>
+      <div id="prevBody"></div>
+    </div>
+
+    <div class="card">
+      <h2>From a file</h2>
+      <p class="note" style="margin-top:0">Any Equalizer APO <span class="mono">ParametricEQ.txt</span> (up to 12 filters), for example from AutoEq or Squiglink.</p>
+      <div class="btns"><label class="btn" for="file">Choose file…</label><input id="file" type="file" accept=".txt,text/plain" hidden></div>
+    </div>
+  </section>
+
+  <!-- ================= DEVICE ================= -->
+  <section class="tab" id="tab-device">
+    <div class="card">
+      <h2>Audita</h2>
+      <dl class="kv" id="devKv"></dl>
+    </div>
+    <div class="card">
+      <h2>Processing load</h2>
+      <dl class="kv" id="loadKv"></dl>
+      <p class="note">Each block of audio is 10 ms long: the processing must stay well below that.</p>
+    </div>
+    <div class="card">
+      <h2>Switching firmware</h2>
+      <p class="note" style="margin-top:0">Audita shares the board with other firmware. To change, power the board on while holding the knob pressed, turn the knob to choose, and press to start.</p>
+    </div>
+    <div class="card about">
+      <h2>About</h2>
+      Audita app 1.0 — listening processor for the forensic transcription of interceptions.<br>
+      Noise reduction: RNNoise (Xiph.Org, BSD). Headphone profiles: AutoEq (Jaakko Pasanen, MIT). Typeface: IBM Plex (SIL OFL).
+    </div>
+  </section>
+</main>
+
+<nav class="tabs" id="tabs">
+  <button data-t="listen" class="on"><svg viewBox="0 0 24 24"><path d="M4 12v-1a8 8 0 0 1 16 0v1"/><rect x="3" y="12" width="4" height="7" rx="1.5"/><rect x="17" y="12" width="4" height="7" rx="1.5"/></svg>Listen</button>
+  <button data-t="tune"><svg viewBox="0 0 24 24"><path d="M5 4v16M12 4v16M19 4v16"/><circle cx="5" cy="14" r="2.2"/><circle cx="12" cy="8" r="2.2"/><circle cx="19" cy="15" r="2.2"/></svg>Tune</button>
+  <button data-t="phones"><svg viewBox="0 0 24 24"><path d="M3 15c3-6 6 6 9 0s6 6 9 0"/></svg>Headphones</button>
+  <button data-t="device"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2.5"/><circle cx="12" cy="14" r="3"/><path d="M9 7h6"/></svg>Device</button>
+</nav>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = (x, d = 0) => (x < 0 ? "−" : "") + Math.abs(x).toFixed(d);
+let toastT = 0;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 3200); }
+
+/* ======================= transport ======================= */
+/* In the app the page talks to window.AuditaBridge (Kotlin, Bluetooth LE). Opened in a desktop browser there is no
+   bridge: a small simulated Audita answers instead (demo and tests). */
+const hasBridge = typeof window.AuditaBridge !== "undefined";
+let reqId = 0;
+const pending = new Map();
+function b64(str) { return btoa(unescape(encodeURIComponent(str))); }
+function req(path, body) {
+  return new Promise((resolve, reject) => {
+    const id = ++reqId;
+    pending.set(id, { resolve, reject });
+    if (hasBridge) AuditaBridge.request(id, path, body ? b64(body) : "");
+    else Mock.request(id, path, body || "");
+  });
+}
+window.auResp = (id, code, body) => {
+  const p = pending.get(id); if (!p) return; pending.delete(id);
+  let j = null; try { j = JSON.parse(body); } catch (e) { j = { err: "bad answer" }; }
+  if (code === 200) p.resolve(j); else p.reject(new Error(j && j.err ? j.err : "error " + code));
+};
+window.auFail = (id, why) => { const p = pending.get(id); if (p) { pending.delete(id); p.reject(new Error(why)); } };
+
+let connState = 0;
+window.auStatus = (st, txt) => {
+  connState = st;
+  const c = $("#conn"); c.dataset.st = st; $("#connTxt").textContent = txt;
+  document.body.classList.toggle("offline", st !== 2);
+  $("#bannerTxt").textContent = st === 1 ? txt : (txt || "Not connected to Audita.");
+  $("#retry").hidden = st === 1;
+  if (st === 2) { loadInfo(); poll(true); }
+};
+function connect() { if (hasBridge) AuditaBridge.connect(); else Mock.connect(); }
+$("#conn").onclick = connect;
+$("#retry").onclick = connect;
+
+/* AutoEq requests (Kotlin downloads; in the browser demo a tiny built-in list) */
+let eqId = 0;
+const eqPending = new Map();
+function eq(kind, ...args) {
+  return new Promise((resolve, reject) => {
+    const id = ++eqId; eqPending.set(id, { resolve, reject });
+    if (hasBridge) { if (kind === "search") AuditaBridge.eqSearch(id, args[0]); else if (kind === "profile") AuditaBridge.eqProfile(id, args[0], args[1]); else AuditaBridge.eqIndexInfo(id, !!args[0]); }
+    else Mock.eq(id, kind, args);
+  });
+}
+window.auEq = (id, data, err) => { const p = eqPending.get(id); if (!p) return; eqPending.delete(id); if (err) p.reject(new Error(err)); else p.resolve(data); };
+
+/* theme follows the phone */
+function setTheme(night) { document.documentElement.dataset.theme = night ? "dark" : "light"; }
+window.auTheme = setTheme;
+setTheme(hasBridge ? AuditaBridge.night() : matchMedia("(prefers-color-scheme: dark)").matches);
+
+/* ======================= state ======================= */
+let S = null;               // last /api/lstate
+let info = null;            // /api/info
+const hold = {};            // controls just changed by the user: their value wins over polling for a moment
+function held(k) { return hold[k] && Date.now() - hold[k] < 1500; }
+
+async function loadInfo() { try { info = await req("/api/info"); renderDevice(); } catch (e) { } }
+
+let pollT = 0, polling = false;
+async function poll(now) {
+  clearTimeout(pollT);
+  if (connState !== 2) return;
+  if (polling) { pollT = setTimeout(poll, 300); return; }
+  polling = true;
+  try { S = await req("/api/lstate"); render(); }
+  catch (e) { }
+  polling = false;
+  const fast = document.visibilityState === "visible" && curTab === "listen";
+  pollT = setTimeout(poll, fast ? 600 : 1500);
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") poll(true); });
+
+async function set(k, v, label) {
+  hold[k] = Date.now();
+  try { await req("/api/lset?k=" + encodeURIComponent(k) + "&v=" + encodeURIComponent(v)); }
+  catch (e) { toast((label || k) + ": " + e.message); hold[k] = 0; poll(true); }
+}
+
+/* ======================= controls ======================= */
+function bindSeg(sel, key, conv, after) {
+  $$(sel + " button").forEach((b) => b.onclick = () => {
+    $$(sel + " button").forEach((x) => x.classList.toggle("on", x === b));
+    if (S) S[key.replace(/^ov\./, "")] = conv ? conv(b.dataset.v) : b.dataset.v;
+    set(key, b.dataset.v); if (after) after();
+  });
+}
+function showSeg(sel, v) { $$(sel + " button").forEach((b) => b.classList.toggle("on", String(b.dataset.v) === String(v))); }
+
+bindSeg("#level", "level", Number);
+bindSeg("#bypass", "bypass", Number);
+bindSeg("#ch", "ch");
+bindSeg("#dn", "dn", Number);
+bindSeg("#bweenv", "bweenv", Number);
+bindSeg("#ret", "ret");
+
+/* volume: sent while dragging (at most every 120 ms) and at release */
+const volEl = $("#vol");
+let volSent = 0, volTimer = 0;
+function volShow(v) { $("#volV").textContent = fmt(v); $("#volHot").hidden = v <= 0; }
+function volSend(v, final) {
+  volShow(v); hold.vol = Date.now();
+  const now = Date.now();
+  clearTimeout(volTimer);
+  if (final || now - volSent > 120) { volSent = now; set("vol", v, "Volume"); }
+  else volTimer = setTimeout(() => volSend(v, true), 130);
+}
+volEl.oninput = () => volSend(+volEl.value, false);
+volEl.onchange = () => volSend(+volEl.value, true);
+$("#volDn").onclick = () => { volEl.value = Math.max(-60, +volEl.value - 1); volSend(+volEl.value, true); };
+$("#volUp").onclick = () => { volEl.value = Math.min(12, +volEl.value + 1); volSend(+volEl.value, true); };
+
+const ceilEl = $("#ceil");
+ceilEl.oninput = () => { $("#ceilV").textContent = fmt(+ceilEl.value); hold.ceil = Date.now(); };
+ceilEl.onchange = () => set("ceil", +ceilEl.value, "Ceiling");
+
+/* processing blocks */
+const BLOCKS = [
+  ["denoise", "Noise reduction", "Removes steady and changing background noise."],
+  ["dereverb", "Room reverb reduction", "Shortens the reverb tail; the reverb time is estimated from the recording."],
+  ["bwe", "Bandwidth extension", "Rebuilds the 3.4–7 kHz band of telephone calls."],
+  ["hum", "Mains hum removal", "50/60 Hz hum and its harmonics."],
+  ["gsm", "GSM buzz removal", "The 217 Hz buzz of mobile phones."],
+  ["level", "Leveler", "Brings quiet and loud voices to a steady level."],
+  ["eq", "Presence boost", "Lifts the consonant region around 2.5 kHz."],
+  ["band", "Band filters", "High- and low-pass matched to the detected bandwidth."],
+];
+$("#blocks").innerHTML = BLOCKS.map(([k, t, d]) =>
+  `<div class="blk"><div class="t">${t}<span class="now" id="now-${k}"></span></div><div class="d">${d}</div>
+   <div class="seg small" id="ov-${k}"><button data-v="auto">Auto</button><button data-v="on">On</button><button data-v="off">Off</button></div></div>`).join("");
+BLOCKS.forEach(([k]) => $$("#ov-" + k + " button").forEach((b) => b.onclick = () => {
+  showSeg("#ov-" + k, b.dataset.v);
+  if (S) S.ov[k] = b.dataset.v;
+  set("ov." + k, b.dataset.v, BLOCKS.find((x) => x[0] === k)[1]);
+}));
+
+/* ======================= rendering ======================= */
+const SRC = { silence: "No signal", mono: "Mono", left: "Left channel only", right: "Right channel only", stereo: "Stereo" };
+const BW = { unknown: "Detecting…", narrow: "Telephone (0.3–3.4 kHz)", wide: "Wideband (up to 8 kHz)", full: "Full band" };
+function meter(el, db) {
+  const w = Math.max(0, Math.min(1, (db + 60) / 60));
+  el.style.width = (w * 100).toFixed(1) + "%"; el.classList.toggle("hot", db > -3);
+}
+function dbTxt(db) { return db <= -119 ? "—" : fmt(db, 0); }
+
+function render() {
+  if (!S) return;
+  if (!held("level")) showSeg("#level", S.level);
+  if (!held("bypass")) showSeg("#bypass", S.bypass);
+  if (!held("ch")) showSeg("#ch", S.ch);
+  if (!held("dn")) showSeg("#dn", S.dn);
+  if (!held("bweenv")) showSeg("#bweenv", S.bwe_env);
+  if (!held("ret")) showSeg("#ret", S.ret);
+  if (!held("vol")) { volEl.value = S.vol; volShow(S.vol); }
+  if (!held("ceil")) { ceilEl.value = S.ceil; $("#ceilV").textContent = fmt(S.ceil); }
+  BLOCKS.forEach(([k]) => { if (!held("ov." + k)) showSeg("#ov-" + k, S.ov[k]); });
+  meter($("#mIn"), S.in_db); meter($("#mOut"), S.out_db);
+  $("#mInV").textContent = dbTxt(S.in_db); $("#mOutV").textContent = dbTxt(S.out_db);
+  $("#ceilNote").textContent = fmt(S.ceil);
+  $("#grNote").textContent = S.gr_db < -0.5 ? ", now reducing " + fmt(-S.gr_db, 1) + " dB" : "";
+  renderDetect(); renderNow(); renderHeq(); renderDevice();
+}
+
+function renderDetect() {
+  const s = S, rows = [];
+  const add = (cls, k, v) => rows.push(`<div><i class="dot ${cls}"></i><span class="k">${k}</span><span class="v">${v}</span></div>`);
+  if (s.bypass) add("warn", "Processing", "Bypassed: you hear the original");
+  add(s.src === "silence" ? "" : "ok", "Source", esc(SRC[s.src] || s.src) + (s.src !== "silence" ? (s.out_mono ? " → mono out" : " → stereo out") : ""));
+  add(s.bw === "unknown" ? "" : "ok", "Bandwidth", esc(BW[s.bw] || s.bw));
+  add(s.speech ? "ok" : "", "Voice", s.src === "silence" ? "—" : s.speech ? "Speaking" : "Pause");
+  add(s.hum ? "warn" : "", "Mains hum", s.ov.hum === "off" ? "Off" : s.hum ? "Found, being removed" : "None");
+  add(s.gsm ? "warn" : "", "GSM buzz", s.ov.gsm === "off" ? "Off" : s.gsm ? "Found, being removed" : "None");
+  add(s.nr_db < -1 ? "ok" : "", "Noise reduction", s.ov.denoise === "off" ? "Off" : s.nr_db < -1 ? fmt(s.nr_db, 0) + " dB" : "Little needed");
+  let rv;
+  if (s.ov.dereverb === "off") rv = "Off";
+  else if (s.drv > 0.05) rv = "Room reverb ≈ " + s.rt60.toFixed(2) + " s, reduced " + Math.round(s.drv * 100) + " %";
+  else if (s.rt_n < 4) rv = "Listening to the room…";
+  else rv = "Dry (≈ " + s.rt60.toFixed(2) + " s)";
+  add(s.drv > 0.05 ? "ok" : "", "Reverb", rv);
+  add(s.bwe ? "ok" : "", "Bandwidth extension", s.ov.bwe === "off" ? "Off" : s.bwe ? "Rebuilding 3.4–7 kHz" : s.bw === "narrow" ? "Waiting for voice" : "Not needed");
+  add(s.heq && s.heq.on ? "ok" : "", "Headphone correction", s.heq && s.heq.n ? (s.heq.on ? esc(s.heq.name) : "Off") : "None loaded");
+  $("#det").innerHTML = rows.join("");
+}
+function renderNow() {
+  const s = S, now = {
+    denoise: s.nr_db < -1 ? "active " + fmt(s.nr_db, 0) + " dB" : "",
+    dereverb: s.drv > 0.05 ? "active " + Math.round(s.drv * 100) + " %" : "",
+    bwe: s.bwe ? "active" : "", hum: s.hum ? "found" : "", gsm: s.gsm ? "found" : "",
+    level: s.ov.level !== "off" ? (s.gain_db >= 0 ? "+" : "") + fmt(s.gain_db, 0) + " dB" : "",
+    band: s.hp || s.lp ? (s.hp ? s.hp + " Hz" : "") + (s.hp && s.lp ? " – " : "") + (s.lp ? (s.lp / 1000).toFixed(1) + " kHz" : "") : "", eq: "",
+  };
+  BLOCKS.forEach(([k]) => { $("#now-" + k).textContent = now[k] || ""; });
+}
+
+/* ======================= headphones ======================= */
+let curHeq = null;           // /api/heq (with filters)
+let heqReqT = 0;
+function renderHeq() {
+  const h = S && S.heq;
+  if (!h) return;
+  const key = h.name + "|" + h.n + "|" + h.preamp;
+  if (!curHeq || curHeq.key !== key) {
+    if (Date.now() - heqReqT > 3000) {
+      heqReqT = Date.now();
+      req("/api/heq").then((j) => { curHeq = Object.assign(j, { key: j.name + "|" + j.n + "|" + j.preamp }); drawCur(); }).catch(() => { });
+    }
+  } else { curHeq.on = h.on; drawCur(); }
+}
+let delAsk = false;
+function drawCur() {
+  const h = curHeq, el = $("#cur");
+  if (!h || !h.n) {
+    el.innerHTML = `<div class="empty">No profile loaded: the headphone output is flat.</div>`; return;
+  }
+  el.innerHTML = `<div class="row"><div class="grow"><b>${esc(h.name)}</b><br><span class="note" style="margin:0">${h.n} filters, preamp ${fmt(h.preamp, 1)} dB</span></div></div>
+    <div class="seg" id="heqOn" style="margin-top:10px"><button data-v="1">Correction on</button><button data-v="0">Off</button></div>
+    ${curve(h.filters, h.preamp)}
+    <div class="btns">${delAsk ? "" : `<button class="btn danger" id="heqDel">Remove profile</button>`}</div>
+    ${delAsk ? `<div class="confirm">Remove “${esc(h.name)}” from Audita?<div class="btns"><button class="btn danger" id="heqDelYes">Remove</button><button class="btn" id="heqDelNo">Keep</button></div></div>` : ""}`;
+  showSeg("#heqOn", h.on ? 1 : 0);
+  $$("#heqOn button").forEach((b) => b.onclick = async () => {
+    showSeg("#heqOn", b.dataset.v);
+    try { const r = await req("/api/heqon?v=" + b.dataset.v); curHeq.on = r.on; if (S) S.heq.on = r.on; } catch (e) { toast(e.message); }
+  });
+  if ($("#heqDel")) $("#heqDel").onclick = () => { delAsk = true; drawCur(); };
+  if ($("#heqDelNo")) $("#heqDelNo").onclick = () => { delAsk = false; drawCur(); };
+  if ($("#heqDelYes")) $("#heqDelYes").onclick = async () => {
+    delAsk = false;
+    try { await req("/api/heqdel"); curHeq = { name: "", n: 0, on: 0, preamp: 0, filters: [], key: "|0|0" }; if (S) S.heq = { name: "", on: 0, n: 0, preamp: 0 }; drawCur(); toast("Profile removed"); }
+    catch (e) { toast(e.message); drawCur(); }
+  };
+}
+
+/* Equalizer APO ParametricEQ.txt: same rules as the firmware (types PK, LSC/LS, HSC/HS, LP, HP, NO; only ON filters) */
+function parseApo(text) {
+  const out = { preamp: 0, filters: [], err: null };
+  const typeOf = (t) => /^(PK|PEQ|BP)$/.test(t) ? "PK" : /^LS/.test(t) ? "LSC" : /^HS/.test(t) ? "HSC" : /^(LP|LPQ)$/.test(t) ? "LP" : /^(HP|HPQ)$/.test(t) ? "HP" : t === "NO" ? "NO" : null;
+  for (const raw of text.split(/\r?\n/)) {
+    const l = raw.trim();
+    let m = l.match(/^Preamp:\s*(-?[\d.]+)\s*dB/i);
+    if (m) { out.preamp = parseFloat(m[1]); continue; }
+    m = l.match(/^Filter\s*\d*:\s*(ON|OFF)\s+(\w+)(.*)$/i);
+    if (!m) continue;
+    if (m[1].toUpperCase() !== "ON") continue;
+    const t = typeOf(m[2].toUpperCase()); if (!t) continue;
+    const fc = (m[3].match(/Fc\s*(-?[\d.]+)/i) || [])[1], g = (m[3].match(/Gain\s*(-?[\d.]+)/i) || [])[1], q = (m[3].match(/Q\s*(-?[\d.]+)/i) || [])[1];
+    if (!fc) continue;
+    out.filters.push({ t, fc: parseFloat(fc), g: g ? parseFloat(g) : 0, q: q ? parseFloat(q) : 0.707 });
+  }
+  if (!out.filters.length) out.err = "No filters found: is this a ParametricEQ.txt file?";
+  else if (out.filters.length > 12) out.err = out.filters.length + " filters: Audita takes up to 12.";
+  return out;
+}
+
+/* magnitude response of the RBJ biquads, drawn 20 Hz – 20 kHz */
+function biquadDb(f, fs, fl) {
+  const A = Math.pow(10, fl.g / 40), w0 = 2 * Math.PI * fl.fc / fs, c = Math.cos(w0), s = Math.sin(w0), al = s / (2 * (fl.q || 0.707));
+  let b0, b1, b2, a0, a1, a2;
+  switch (fl.t) {
+    case "PK": b0 = 1 + al * A; b1 = -2 * c; b2 = 1 - al * A; a0 = 1 + al / A; a1 = -2 * c; a2 = 1 - al / A; break;
+    case "LSC": { const r = 2 * Math.sqrt(A) * al; b0 = A * ((A + 1) - (A - 1) * c + r); b1 = 2 * A * ((A - 1) - (A + 1) * c); b2 = A * ((A + 1) - (A - 1) * c - r);
+      a0 = (A + 1) + (A - 1) * c + r; a1 = -2 * ((A - 1) + (A + 1) * c); a2 = (A + 1) + (A - 1) * c - r; break; }
+    case "HSC": { const r = 2 * Math.sqrt(A) * al; b0 = A * ((A + 1) + (A - 1) * c + r); b1 = -2 * A * ((A - 1) + (A + 1) * c); b2 = A * ((A + 1) + (A - 1) * c - r);
+      a0 = (A + 1) - (A - 1) * c + r; a1 = 2 * ((A - 1) - (A + 1) * c); a2 = (A + 1) - (A - 1) * c - r; break; }
+    case "LP": b0 = (1 - c) / 2; b1 = 1 - c; b2 = (1 - c) / 2; a0 = 1 + al; a1 = -2 * c; a2 = 1 - al; break;
+    case "HP": b0 = (1 + c) / 2; b1 = -(1 + c); b2 = (1 + c) / 2; a0 = 1 + al; a1 = -2 * c; a2 = 1 - al; break;
+    case "NO": b0 = 1; b1 = -2 * c; b2 = 1; a0 = 1 + al; a1 = -2 * c; a2 = 1 - al; break;
+    default: return 0;
+  }
+  const w = 2 * Math.PI * f / fs, cr = Math.cos(w), ci = -Math.sin(w), c2r = Math.cos(2 * w), c2i = -Math.sin(2 * w);
+  const nr = b0 + b1 * cr + b2 * c2r, ni = b1 * ci + b2 * c2i, dr = a0 + a1 * cr + a2 * c2r, di = a1 * ci + a2 * c2i;
+  return 10 * Math.log10((nr * nr + ni * ni) / (dr * dr + di * di));
+}
+function curve(filters, preamp) {
+  if (!filters || !filters.length) return "";
+  const W = 480, H = 150, N = 120, pts = [];
+  let lo = -12, hi = 12;
+  const ys = [];
+  for (let i = 0; i <= N; i++) {
+    const f = 20 * Math.pow(1000, i / N);
+    let db = preamp || 0; for (const fl of filters) db += biquadDb(f, 48000, fl);
+    ys.push(db); lo = Math.min(lo, db); hi = Math.max(hi, db);
+  }
+  const span = Math.max(hi, -lo) + 2, y = (db) => H / 2 - db / span * (H / 2 - 8);
+  ys.forEach((db, i) => pts.push((i / N * W).toFixed(1) + "," + y(db).toFixed(1)));
+  const grid = [100, 1000, 10000].map((f) => { const x = Math.log10(f / 20) / 3 * W; return `<line x1="${x}" x2="${x}" y1="0" y2="${H}" stroke="var(--line)"/><text x="${x + 4}" y="${H - 6}" font-size="11" fill="var(--muted)">${f >= 1000 ? f / 1000 + "k" : f}</text>`; }).join("");
+  return `<svg class="curve" viewBox="0 0 ${W} ${H}" role="img" aria-label="Frequency response">${grid}
+    <line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-dasharray="4 4"/>
+    <text x="6" y="${y(0) - 5}" font-size="11" fill="var(--muted)">0 dB</text>
+    <polyline points="${pts.join(" ")}" fill="none" stroke="var(--accent)" stroke-width="2.2" vector-effect="non-scaling-stroke"/></svg>`;
+}
+function filterTable(fs) {
+  return `<table class="f mono"><tr><th>Type</th><th>Hz</th><th>dB</th><th>Q</th></tr>${fs.map((f) =>
+    `<tr><td>${f.t}</td><td>${f.fc >= 1000 ? (f.fc / 1000).toFixed(2) + "k" : Math.round(f.fc)}</td><td>${fmt(f.g, 1)}</td><td>${f.q.toFixed(2)}</td></tr>`).join("")}</table>`;
+}
+
+/* firmware keeps 47 bytes of name */
+function shortName(s) { let o = ""; for (const ch of s) { if (new TextEncoder().encode(o + ch).length > 47) break; o += ch; } return o; }
+let preview = null;
+function showPreview(title, subtitle, text) {
+  const p = parseApo(text);
+  preview = { name: shortName(title), text, p };
+  $("#prev").hidden = false;
+  $("#prevBody").innerHTML = `<b>${esc(title)}</b><br><span class="note" style="margin:0">${esc(subtitle)}</span>
+    ${p.err ? `<div class="confirm">${esc(p.err)}</div>` : `${curve(p.filters, p.preamp)}<div class="note">${p.filters.length} filters, preamp ${fmt(p.preamp, 1)} dB</div>${filterTable(p.filters)}`}
+    <div class="btns">${p.err ? "" : `<button class="btn primary" id="load">Load into Audita</button>`}<button class="btn" id="prevClose">Close</button></div>`;
+  $("#prevClose").onclick = () => { $("#prev").hidden = true; preview = null; };
+  if ($("#load")) $("#load").onclick = loadPreview;
+  $("#prev").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+async function loadPreview() {
+  if (!preview) return;
+  if (connState !== 2) { toast("Connect to Audita first"); return; }
+  const b = $("#load"); b.disabled = true; b.textContent = "Loading…";
+  try {
+    const r = await req("/api/heqset?name=" + encodeURIComponent(preview.name), preview.text);
+    curHeq = Object.assign(r.heq, { key: r.heq.name + "|" + r.heq.n + "|" + r.heq.preamp });
+    if (S) S.heq = { name: r.heq.name, on: r.heq.on, n: r.heq.n, preamp: r.heq.preamp };
+    drawCur(); toast(r.saved ? "Loaded and saved on Audita" : "Loaded (not saved: Audita memory full?)");
+    $("#prev").hidden = true; preview = null;
+    $("#cur").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) { toast("Not loaded: " + e.message); b.disabled = false; b.textContent = "Load into Audita"; }
+}
+
+let qT = 0, qSeq = 0;
+$("#q").oninput = () => { clearTimeout(qT); qT = setTimeout(search, 300); };
+$("#q").onkeydown = (e) => { if (e.key === "Enter") { clearTimeout(qT); search(); } };
+async function search() {
+  const q = $("#q").value.trim(), my = ++qSeq, res = $("#res");
+  if (q.length < 2) { res.innerHTML = ""; return; }
+  res.innerHTML = `<div class="empty">Searching…</div>`;
+  try {
+    const list = JSON.parse(await eq("search", q));
+    if (my !== qSeq) return;
+    if (!list.length) { res.innerHTML = `<div class="empty">No profiles for “${esc(q)}”. Try fewer words or the brand only.</div>`; return; }
+    res.innerHTML = list.map((e, i) => `<button data-i="${i}"><b>${esc(e.name)}</b><span>${esc(e.source)}</span></button>`).join("");
+    $$("#res button").forEach((b) => b.onclick = async () => {
+      const e = list[+b.dataset.i];
+      b.querySelector("span").textContent = "Downloading…";
+      try { showPreview(e.name, "AutoEq · " + e.source, await eq("profile", e.path, e.name)); }
+      catch (err) { toast(err.message); }
+      b.querySelector("span").textContent = e.source;
+    });
+  } catch (e) { if (my === qSeq) res.innerHTML = `<div class="empty">${esc(e.message)}. Check the phone's internet connection.</div>`; }
+}
+async function indexInfo(refresh) {
+  try {
+    const j = JSON.parse(await eq("info", refresh));
+    const d = new Date(j.updated);
+    $("#idxNote").innerHTML = `${j.count.toLocaleString("en")} profiles from the <a href="https://github.com/jaakkopasanen/AutoEq">AutoEq</a> database, downloaded ${d.toLocaleDateString()}. <a href="#" id="idxRef">Update</a>`;
+    $("#idxRef").onclick = (e) => { e.preventDefault(); $("#idxNote").textContent = "Updating the AutoEq list…"; indexInfo(true); };
+  } catch (e) { $("#idxNote").textContent = e.message; }
+}
+$("#file").onchange = () => {
+  const f = $("#file").files[0]; if (!f) return;
+  if (f.size > 8192) { toast("File too large for a ParametricEQ.txt"); return; }
+  const r = new FileReader();
+  r.onload = () => showPreview(f.name.replace(/\s*ParametricEQ\.txt$/i, "").replace(/\.txt$/i, ""), "From file " + f.name, String(r.result));
+  r.readAsText(f);
+  $("#file").value = "";
+};
+
+/* ======================= device ======================= */
+const USB = ["Off", "Not connected to a computer", "Connected", "Connected, playing"];
+function renderDevice() {
+  const kv = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+  $("#devKv").innerHTML = kv("Firmware", info ? esc(info.name + " " + info.ver) : "—") + kv("Connection", esc($("#connTxt").textContent)) +
+    kv("USB audio", S ? USB[S.usb] || "—" : "—") + kv("Headphone profile", S && S.heq && S.heq.n ? esc(S.heq.name) + (S.heq.on ? "" : " (off)") : "None");
+  if (!S) { $("#loadKv").innerHTML = ""; return; }
+  $("#loadKv").innerHTML = kv("Audio processing", `<span class="mono">${(S.dsp_us / 1000).toFixed(1)} ms</span> (${Math.round(S.dsp_us / 100)} %)`) +
+    kv("Neural network", `<span class="mono">${(S.rnn_us / 1000).toFixed(1)} ms</span>`) +
+    kv("Blocks late", `<span class="mono">${S.rnn_late}</span>`);
+}
+
+/* ======================= tabs ======================= */
+let curTab = "listen";
+$$("#tabs button").forEach((b) => b.onclick = () => {
+  curTab = b.dataset.t;
+  $$("#tabs button").forEach((x) => x.classList.toggle("on", x === b));
+  $$(".tab").forEach((t) => t.classList.toggle("on", t.id === "tab-" + curTab));
+  window.scrollTo(0, 0);
+  if (curTab === "phones" && !$("#idxNote").dataset.done) { $("#idxNote").dataset.done = 1; indexInfo(false); }
+  poll(true);
+});
+renderDetectEmpty();
+function renderDetectEmpty() { $("#det").innerHTML = `<div><i class="dot"></i><span class="k">Waiting for Audita</span><span class="v">—</span></div>`; drawCur(); renderDevice(); }
+
+/* ======================= browser demo (no Kotlin bridge) ======================= */
+const Mock = {
+  st: { usb: 3, src: "mono", out_mono: 1, ch: "auto", level: 1, bypass: 0, vol: -24, ceil: -3, ret: "proc", bw: "narrow", hum: 0, gsm: 1, hum_db: 0, gsm_db: -38,
+    speech: 1, speech_db: -24, floor_db: -62, gain_db: 6, nr_db: -9.5, bwe: 1, hp: 60, lp: 7500, in_db: -26, out_db: -18, gr_db: 0, dsp_us: 4100, dn: 1, nn_vad: 0.8,
+    rnn_us: 2600, rnn_late: 0, rt60: 0.2, rt_n: 9, drv: 0, bwe_env: 1, ov: { band: "auto", hum: "auto", gsm: "auto", level: "auto", eq: "auto", denoise: "auto", bwe: "auto", dereverb: "auto" },
+    heq: { name: "", on: 0, n: 0, preamp: 0 } },
+  heq: { name: "", on: 0, n: 0, preamp: 0, filters: [] },
+  answer(id, code, obj, delay) { setTimeout(() => window.auResp(id, code, JSON.stringify(obj)), delay || 40); },
+  connect() { window.auStatus(1, "Searching for Audita… (demo)"); setTimeout(() => window.auStatus(2, "Connected to Audita (demo)"), 500); },
+  request(id, path, body) {
+    const [p, q] = path.split("?"), a = new URLSearchParams(q || ""), s = this.st;
+    if (connState !== 2) return setTimeout(() => window.auFail(id, "not connected"), 10);
+    if (p === "/api/info") return this.answer(id, 200, { fw: "audita", ver: "demo", name: "Audita" });
+    if (p === "/api/lstate") {
+      const t = Date.now() / 1000; s.in_db = -26 + 6 * Math.sin(t * 2.1); s.out_db = s.vol + 6 + 3 * Math.sin(t * 1.3); s.speech = Math.sin(t * 0.7) > -0.4 ? 1 : 0;
+      return this.answer(id, 200, s);
+    }
+    if (p === "/api/lset") {
+      const k = a.get("k"), v = a.get("v");
+      if (k === "vol") s.vol = Math.max(-60, Math.min(12, +v)); else if (k === "ceil") s.ceil = Math.max(-30, Math.min(0, +v));
+      else if (k === "ch") s.ch = v === "mono" ? "mono" : "auto"; else if (k === "level") s.level = +v; else if (k === "bypass") s.bypass = +v ? 1 : 0;
+      else if (k === "ret") s.ret = v === "out" ? "out" : "proc"; else if (k === "dn") s.dn = +v; else if (k === "bweenv") s.bwe_env = +v ? 1 : 0;
+      else if (k && k.startsWith("ov.") && k.slice(3) in s.ov && ["auto", "on", "off"].includes(v)) s.ov[k.slice(3)] = v;
+      else return this.answer(id, 400, { err: "unknown key" });
+      return this.answer(id, 200, { ok: 1 });
+    }
+    if (p === "/api/heq") return this.answer(id, 200, this.heq);
+    if (p === "/api/heqset") {
+      const r = parseApo(body); if (r.err) return this.answer(id, 400, { err: r.err });
+      this.heq = { name: a.get("name") || "Custom", on: 1, n: r.filters.length, preamp: r.preamp, filters: r.filters };
+      s.heq = { name: this.heq.name, on: 1, n: this.heq.n, preamp: r.preamp };
+      return this.answer(id, 200, { ok: 1, saved: 1, heq: this.heq }, 300);
+    }
+    if (p === "/api/heqon") { this.heq.on = +a.get("v") && this.heq.n ? 1 : 0; s.heq.on = this.heq.on; return this.answer(id, 200, { ok: 1, on: this.heq.on }); }
+    if (p === "/api/heqdel") { this.heq = { name: "", on: 0, n: 0, preamp: 0, filters: [] }; s.heq = { name: "", on: 0, n: 0, preamp: 0 }; return this.answer(id, 200, { ok: 1 }); }
+    this.answer(id, 404, { err: "not found" });
+  },
+  eq(id, kind, args) {
+    const list = [{ name: "Sennheiser HD 600", path: "./oratory1990/over-ear/Sennheiser%20HD%20600", source: "oratory1990" },
+                  { name: "Sennheiser HD 650", path: "./oratory1990/over-ear/Sennheiser%20HD%20650", source: "oratory1990" },
+                  { name: "Beyerdynamic DT 770 PRO 80 Ohm", path: "./oratory1990/over-ear/Beyerdynamic%20DT%20770%20PRO%2080%20Ohm", source: "oratory1990" }];
+    const done = (d, e) => setTimeout(() => window.auEq(id, d, e), 120);
+    if (kind === "info") return done(JSON.stringify({ count: list.length, updated: Date.now() }), null);
+    if (kind === "search") { const t = args[0].toLowerCase().split(/\s+/); return done(JSON.stringify(list.filter((e) => t.every((x) => (e.name + " " + e.source).toLowerCase().includes(x)))), null); }
+    return done("Preamp: -6.3 dB\nFilter 1: ON LSC Fc 105 Hz Gain 6.5 dB Q 0.70\nFilter 2: ON PK Fc 125 Hz Gain -2.7 dB Q 0.55\nFilter 3: ON PK Fc 8445 Hz Gain 3.3 dB Q 1.61\nFilter 4: ON PK Fc 522 Hz Gain 0.7 dB Q 1.02\nFilter 5: ON PK Fc 1298 Hz Gain -1.2 dB Q 2.14\nFilter 6: ON HSC Fc 10000 Hz Gain -3.1 dB Q 0.70\n", null);
+  },
+};
+
+/* start */
+if (hasBridge) { window.auStatus(0, "Starting…"); AuditaBridge.ready(); } else { window.auStatus(0, "Demo: no Bluetooth in a browser"); setTimeout(() => Mock.connect(), 300); }
+</script>
+</body>
+</html>
