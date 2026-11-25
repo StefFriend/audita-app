@@ -629,7 +629,7 @@ function renderDetect() {
   add(s.bwe ? "ok" : "", "Bandwidth extension", s.ov.bwe === "off" ? "Off" : s.bwe ? "Rebuilding 3.4–7 kHz" : s.bw === "narrow" ? "Waiting for voice" : "Not needed");
   add(s.clip ? "warn" : "", "Clipping", s.ov.restore === "off" ? "Off" : s.clip ? "Found, peaks rebuilt" : "None");
   add(s.click ? "warn" : "", "Clicks", s.ov.restore === "off" ? "Off" : s.click ? "Found, being removed" : "None");
-  add(s.tones ? "warn" : "", "Tones and whistles", s.ov.tones === "off" ? "Off" : s.tones ? "Near " + Math.round(s.tone_hz / 50) * 50 + " Hz, being removed" : "None");
+  add(s.tones ? "warn" : "", "Tones and whistles", s.ov.tones === "off" ? "Off" : s.tones ? "Near " + Math.round(s.tone_hz / 10) * 10 + " Hz, being removed" : "None");
   add(s.heq && s.heq.on ? "ok" : "", "Headphone correction", s.heq && s.heq.n ? (s.heq.on ? esc(s.heq.name) : "Off") : "None loaded");
   $("#det").innerHTML = rows.join("");
 }
@@ -640,7 +640,7 @@ function renderNow() {
     bwe: s.bwe ? "active" : "", hum: s.hum ? "found" : "", gsm: s.gsm ? "found" : "",
     level: s.ov.level !== "off" ? (s.gain_db >= 0 ? "+" : "") + fmt(s.gain_db, 0) + " dB" : "",
     restore: s.clip || s.click ? (s.clip ? "clipping" : "") + (s.clip && s.click ? ", " : "") + (s.click ? "clicks" : "") : "",
-    tones: s.tones ? "near " + Math.round(s.tone_hz / 50) * 50 + " Hz" : "",
+    tones: s.tones ? "near " + Math.round(s.tone_hz / 10) * 10 + " Hz" : "",
     band: s.hp || s.lp ? (s.hp ? s.hp + " Hz" : "") + (s.hp && s.lp ? " – " : "") + (s.lp ? (s.lp / 1000).toFixed(1) + " kHz" : "") : "", eq: "",
   };
   BLOCKS.forEach(([k]) => { $("#now-" + k).textContent = now[k] || ""; });
