@@ -137,7 +137,7 @@ dl.kv dd { margin: 0; text-align: right; }
 .about a { color: var(--accent); }
 
 /* bottom tabs */
-nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(4, 1fr);
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(5, 1fr);
   background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
 nav.tabs button { border: 0; background: transparent; padding: 8px 4px 9px; font-size: 11.5px; color: var(--muted); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
 nav.tabs button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -149,6 +149,21 @@ nav.tabs button.on { color: var(--accent); font-weight: 600; }
 .banner { display: none; margin-bottom: 12px; padding: 12px 14px; border-radius: 12px; background: var(--warn-soft); font-size: 13.5px; }
 .offline .banner { display: block; }
 .banner .btn { margin-top: 8px; }
+.dis { opacity: .45; pointer-events: none; }
+.hiq { background: var(--accent-soft); border-color: var(--accent); }
+.dose { height: 12px; border-radius: 6px; background: var(--sunk); overflow: hidden; margin: 8px 0 4px; position: relative; }
+.dose i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); }
+.dose i.warn { background: var(--warn); }
+.dose i.hot { background: var(--meter-hot); }
+.toggles .blk:first-of-type { border-top: 0; }
+.note-in { display: flex; gap: 8px; }
+.note-in input { flex: 1; min-width: 0; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--sunk); color: var(--ink); font: inherit; }
+.log { margin-top: 8px; font-size: 13.5px; }
+.log div { display: grid; grid-template-columns: 78px 1fr; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
+.log div:first-child { border-top: 0; }
+.log .tm { color: var(--muted); font-size: 12px; }
+.log .tm b { display: block; font-weight: 500; color: var(--ink); font-size: 13px; }
+.log .nt { font-weight: 600; }
 </style>
 </head>
 <body class="offline">
@@ -164,7 +179,12 @@ nav.tabs button.on { color: var(--accent); font-weight: 600; }
 
   <!-- ================= LISTEN ================= -->
   <section class="tab on" id="tab-listen">
-    <div class="card live">
+    <div class="card hiq" id="hiqCard" hidden>
+      <h2>96 kHz playback</h2>
+      <div>Audita is in 96 kHz mode: no processing (bypass) and no return to the computer. Volume, headphone correction and the limiter still work.</div>
+      <div class="btns"><button class="btn" id="hiqBack">Back to 48 kHz with processing</button></div>
+    </div>
+    <div class="card live proc">
       <h2>Intensity</h2>
       <div class="seg big accent" id="level">
         <button data-v="0">Low<small>Gentle</small></button>
@@ -174,12 +194,23 @@ nav.tabs button.on { color: var(--accent); font-weight: 600; }
       <p class="note">Everything else adapts by itself to the recording. Higher intensity removes more noise but can make voices sound processed.</p>
     </div>
 
-    <div class="card live">
+    <div class="card live proc">
       <h2>Compare</h2>
       <div class="compare" id="bypass">
         <button data-v="0"><b>Processed</b><span>What Audita does</span></button>
         <button data-v="1" class="orig"><b>Original</b><span>Bypass, untouched</span></button>
       </div>
+      <p class="note" id="matchNote"></p>
+    </div>
+
+    <div class="card live proc">
+      <h2>Listen to</h2>
+      <div class="seg" id="side">
+        <button data-v="auto">Both sides</button>
+        <button data-v="left">Left only</button>
+        <button data-v="right">Right only</button>
+      </div>
+      <p class="note">For recordings with the two speakers, or two microphones, on separate channels: the chosen side plays in both ears.</p>
     </div>
 
     <div class="card live">
@@ -199,6 +230,14 @@ nav.tabs button.on { color: var(--accent); font-weight: 600; }
     <div class="card">
       <h2>What Audita detects</h2>
       <div class="det" id="det"></div>
+    </div>
+
+    <div class="card live">
+      <h2>Hearing protection</h2>
+      <div class="row"><span class="grow" id="doseTxt">–</span><span class="mono" id="doseNow"></span></div>
+      <div class="dose"><i id="doseBar"></i></div>
+      <p class="note" id="doseNote">Daily limit: 80 dB for 8 hours (EU lower action value). Estimate from the headphone sensitivity set in Tune.</p>
+      <div class="btns" id="doseBtns"><button class="btn" id="doseReset">Reset today's dose</button></div>
     </div>
   </section>
 
@@ -229,7 +268,19 @@ nav.tabs button.on { color: var(--accent); font-weight: 600; }
       <p class="note">Auto lets Audita decide from the recording. On forces a block even when it is not detected; Off removes it.</p>
     </div>
 
-    <div class="card live">
+    <div class="card live proc toggles">
+      <h2>Options</h2>
+      <div class="blk"><div class="t">Level-matched compare</div><div class="d">The original is played at the same loudness as the processed sound, so the comparison is fair (louder always sounds better).</div>
+        <div class="seg small" id="match"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
+      <div class="blk"><div class="t">Room memory between files</div><div class="d">Keeps the noise and reverb estimates when a new file starts: useful for many clips from the same place.</div>
+        <div class="seg small" id="keep"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
+      <div class="blk"><div class="t">Shock guard</div><div class="d">Holds sudden bangs (doors, knocks, a handled microphone) close to the level of the speech.</div>
+        <div class="seg small" id="shock"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
+      <div class="blk"><div class="t">Telephone bass</div><div class="d">Rebuilds the band below 300 Hz on phone calls, for a less thin voice. Part of the bandwidth extension.</div>
+        <div class="seg small" id="lb"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
+    </div>
+
+    <div class="card live proc">
       <h2>Bandwidth extension envelope</h2>
       <div class="seg" id="bweenv">
         <button data-v="1">Learned</button>
@@ -246,6 +297,20 @@ nav.tabs button.on { color: var(--accent); font-weight: 600; }
     </div>
 
     <div class="card live">
+      <h2>Headphone sensitivity</h2>
+      <div class="vol"><span class="v mono" id="sensV">–</span><span class="u">dB SPL at full scale</span></div>
+      <input type="range" id="sens" min="80" max="140" step="1" value="110">
+      <p class="note">Used only for the hearing dose. Leave 110 if unsure: it overestimates most headphones, which is the safe side.</p>
+    </div>
+
+    <div class="card live">
+      <h2>Sample rate</h2>
+      <div class="seg" id="hiq"><button data-v="0">48 kHz, processing</button><button data-v="1">96 kHz, playback only</button></div>
+      <p class="note">96 kHz plays high-resolution files untouched (bypass), without the return to the computer. Audita restarts to change mode.</p>
+      <div id="hiqAsk"></div>
+    </div>
+
+    <div class="card live proc">
       <h2>USB return to the computer</h2>
       <div class="seg" id="ret">
         <button data-v="proc">Processed</button>
@@ -281,6 +346,21 @@ nav.tabs button.on { color: var(--accent); font-weight: 600; }
     </div>
   </section>
 
+  <!-- ================= LOG ================= -->
+  <section class="tab" id="tab-log">
+    <div class="card live">
+      <h2>Add a note</h2>
+      <div class="note-in"><input id="noteIn" maxlength="40" placeholder="e.g. file 45, call at 10:32" enterkeyhint="done"><button class="btn primary" id="noteAdd">Add</button></div>
+      <p class="note">Notes go into the session log with the time, next to what Audita did.</p>
+    </div>
+    <div class="card">
+      <h2>Session log</h2>
+      <div class="btns"><button class="btn" id="logTxt">Save as text</button><button class="btn" id="logCsv">Save as CSV</button><button class="btn" id="logShare">Share</button></div>
+      <p class="note" id="logInfo">What Audita detected and every change of settings, with the time. Kept on Audita (about the last 1,000 events) and in this app.</p>
+      <div class="log" id="logList"></div>
+    </div>
+  </section>
+
   <!-- ================= DEVICE ================= -->
   <section class="tab" id="tab-device">
     <div class="card">
@@ -298,7 +378,7 @@ nav.tabs button.on { color: var(--accent); font-weight: 600; }
     </div>
     <div class="card about">
       <h2>About</h2>
-      Audita app 1.0 — listening processor for the forensic transcription of interceptions.<br>
+      Audita app 1.1 — listening processor for the forensic transcription of interceptions.<br>
       Noise reduction: RNNoise (Xiph.Org, BSD). Headphone profiles: AutoEq (Jaakko Pasanen, MIT). Typeface: IBM Plex (SIL OFL).
     </div>
   </section>
@@ -308,6 +388,7 @@ nav.tabs button.on { color: var(--accent); font-weight: 600; }
   <button data-t="listen" class="on"><svg viewBox="0 0 24 24"><path d="M4 12v-1a8 8 0 0 1 16 0v1"/><rect x="3" y="12" width="4" height="7" rx="1.5"/><rect x="17" y="12" width="4" height="7" rx="1.5"/></svg>Listen</button>
   <button data-t="tune"><svg viewBox="0 0 24 24"><path d="M5 4v16M12 4v16M19 4v16"/><circle cx="5" cy="14" r="2.2"/><circle cx="12" cy="8" r="2.2"/><circle cx="19" cy="15" r="2.2"/></svg>Tune</button>
   <button data-t="phones"><svg viewBox="0 0 24 24"><path d="M3 15c3-6 6 6 9 0s6 6 9 0"/></svg>Headphones</button>
+  <button data-t="log"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/></svg>Log</button>
   <button data-t="device"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2.5"/><circle cx="12" cy="14" r="3"/><path d="M9 7h6"/></svg>Device</button>
 </nav>
 <div id="toast"></div>
@@ -350,7 +431,7 @@ window.auStatus = (st, txt) => {
   document.body.classList.toggle("offline", st !== 2);
   $("#bannerTxt").textContent = st === 1 ? txt : (txt || "Not connected to Audita.");
   $("#retry").hidden = st === 1;
-  if (st === 2) { loadInfo(); poll(true); }
+  if (st === 2) { timeSent = false; loadInfo(); poll(true); }
 };
 function connect() { if (hasBridge) AuditaBridge.connect(); else Mock.connect(); }
 $("#conn").onclick = connect;
@@ -417,6 +498,38 @@ bindSeg("#ch", "ch");
 bindSeg("#dn", "dn", Number);
 bindSeg("#bweenv", "bweenv", Number);
 bindSeg("#ret", "ret");
+bindSeg("#match", "match", Number);
+bindSeg("#keep", "keep", Number);
+bindSeg("#shock", "shock", Number);
+bindSeg("#lb", "lb", Number);
+/* lato da ascoltare: imposta i canali (auto / solo sinistro / solo destro) */
+$$("#side button").forEach((b) => b.onclick = () => {
+  showSeg("#side", b.dataset.v); showSeg("#ch", b.dataset.v === "auto" ? "auto" : "");
+  if (S) S.ch = b.dataset.v; set("ch", b.dataset.v, "Channels");
+});
+const sensEl = $("#sens");
+sensEl.oninput = () => { $("#sensV").textContent = sensEl.value; hold.sens = Date.now(); };
+sensEl.onchange = () => set("sens", +sensEl.value, "Sensitivity");
+/* 96 kHz: conferma nella pagina, poi Audita si riavvia */
+$$("#hiq button").forEach((b) => b.onclick = () => {
+  const v = +b.dataset.v;
+  if (!S || v === S.hiq) { showSeg("#hiq", S ? S.hiq : 0); return; }
+  $("#hiqAsk").innerHTML = `<div class="confirm">${v ? "Audita restarts in 96 kHz playback-only mode: no processing and no return to the computer. In Windows, set 96000 Hz as the format of “Cuffie (Audita)”." : "Audita restarts at 48 kHz with processing."} The connection drops for a few seconds.
+    <div class="btns"><button class="btn primary" id="hiqGo">Restart Audita</button><button class="btn" id="hiqNo">Cancel</button></div></div>`;
+  $("#hiqNo").onclick = () => { $("#hiqAsk").innerHTML = ""; showSeg("#hiq", S.hiq); };
+  $("#hiqGo").onclick = () => switchHiq(v);
+});
+async function switchHiq(v) {
+  $("#hiqAsk").innerHTML = "";
+  try { await req("/api/lset?k=hiq&v=" + v); toast("Audita is restarting…"); } catch (e) { toast("Not changed: " + e.message); }
+}
+$("#hiqBack").onclick = () => switchHiq(0);
+let doseAsk = false;
+$("#doseReset").onclick = () => {
+  if (!doseAsk) { doseAsk = true; $("#doseReset").textContent = "Tap again to reset"; setTimeout(() => { doseAsk = false; $("#doseReset").textContent = "Reset today's dose"; }, 3000); return; }
+  doseAsk = false; $("#doseReset").textContent = "Reset today's dose";
+  req("/api/dosereset").then(() => toast("Dose reset (written in the log)")).catch((e) => toast(e.message));
+};
 
 /* volume: sent while dragging (at most every 120 ms) and at release */
 const volEl = $("#vol");
@@ -448,6 +561,8 @@ const BLOCKS = [
   ["level", "Leveler", "Brings quiet and loud voices to a steady level."],
   ["eq", "Presence boost", "Lifts the consonant region around 2.5 kHz."],
   ["band", "Band filters", "High- and low-pass matched to the detected bandwidth."],
+  ["restore", "Click & clip repair", "Rebuilds clipped peaks and removes clicks and crackle."],
+  ["tones", "Tone & whistle removal", "Ring and line tones, whistles, TV whine: found in the pauses, removed also under the voice."],
 ];
 $("#blocks").innerHTML = BLOCKS.map(([k, t, d]) =>
   `<div class="blk"><div class="t">${t}<span class="now" id="now-${k}"></span></div><div class="d">${d}</div>
@@ -475,6 +590,14 @@ function render() {
   if (!held("dn")) showSeg("#dn", S.dn);
   if (!held("bweenv")) showSeg("#bweenv", S.bwe_env);
   if (!held("ret")) showSeg("#ret", S.ret);
+  if (!held("ch")) showSeg("#side", S.ch === "left" || S.ch === "right" ? S.ch : S.ch === "auto" ? "auto" : "");
+  ["match", "keep", "shock", "lb"].forEach((k) => { if (!held(k)) showSeg("#" + k, S[k]); });
+  if (!held("sens")) { sensEl.value = S.sens; $("#sensV").textContent = S.sens; }
+  if (!$("#hiqAsk").innerHTML) showSeg("#hiq", S.hiq);
+  $("#hiqCard").hidden = !S.hiq;
+  $$(".proc").forEach((el) => el.classList.toggle("dis", !!S.hiq));
+  $("#matchNote").textContent = S.hiq ? "" : S.match ? (Math.abs(S.match_db) >= 0.5 ? `The original is level-matched (${S.match_db > 0 ? "+" : ""}${S.match_db.toFixed(1)} dB) so the comparison is fair.` : "The original is level-matched to the processed sound.") : "Level matching is off: the processed sound is usually louder.";
+  renderDose(); logSync();
   if (!held("vol")) { volEl.value = S.vol; volShow(S.vol); }
   if (!held("ceil")) { ceilEl.value = S.ceil; $("#ceilV").textContent = fmt(S.ceil); }
   BLOCKS.forEach(([k]) => { if (!held("ov." + k)) showSeg("#ov-" + k, S.ov[k]); });
@@ -488,7 +611,9 @@ function render() {
 function renderDetect() {
   const s = S, rows = [];
   const add = (cls, k, v) => rows.push(`<div><i class="dot ${cls}"></i><span class="k">${k}</span><span class="v">${v}</span></div>`);
-  if (s.bypass) add("warn", "Processing", "Bypassed: you hear the original");
+  if (s.hiq) add("warn", "Processing", "96 kHz mode: none (bypass)");
+  else if (s.bypass) add("warn", "Processing", "Bypassed: you hear the original" + (s.match ? ", level-matched" : ""));
+  if (s.ch === "left" || s.ch === "right") add("warn", "Listening", (s.ch === "left" ? "Left" : "Right") + " side only");
   add(s.src === "silence" ? "" : "ok", "Source", esc(SRC[s.src] || s.src) + (s.src !== "silence" ? (s.out_mono ? " → mono out" : " → stereo out") : ""));
   add(s.bw === "unknown" ? "" : "ok", "Bandwidth", esc(BW[s.bw] || s.bw));
   add(s.speech ? "ok" : "", "Voice", s.src === "silence" ? "—" : s.speech ? "Speaking" : "Pause");
@@ -502,6 +627,9 @@ function renderDetect() {
   else rv = "Dry (≈ " + s.rt60.toFixed(2) + " s)";
   add(s.drv > 0.05 ? "ok" : "", "Reverb", rv);
   add(s.bwe ? "ok" : "", "Bandwidth extension", s.ov.bwe === "off" ? "Off" : s.bwe ? "Rebuilding 3.4–7 kHz" : s.bw === "narrow" ? "Waiting for voice" : "Not needed");
+  add(s.clip ? "warn" : "", "Clipping", s.ov.restore === "off" ? "Off" : s.clip ? "Found, peaks rebuilt" : "None");
+  add(s.click ? "warn" : "", "Clicks", s.ov.restore === "off" ? "Off" : s.click ? "Found, being removed" : "None");
+  add(s.tones ? "warn" : "", "Tones and whistles", s.ov.tones === "off" ? "Off" : s.tones ? "Near " + Math.round(s.tone_hz / 50) * 50 + " Hz, being removed" : "None");
   add(s.heq && s.heq.on ? "ok" : "", "Headphone correction", s.heq && s.heq.n ? (s.heq.on ? esc(s.heq.name) : "Off") : "None loaded");
   $("#det").innerHTML = rows.join("");
 }
@@ -511,10 +639,95 @@ function renderNow() {
     dereverb: s.drv > 0.05 ? "active " + Math.round(s.drv * 100) + " %" : "",
     bwe: s.bwe ? "active" : "", hum: s.hum ? "found" : "", gsm: s.gsm ? "found" : "",
     level: s.ov.level !== "off" ? (s.gain_db >= 0 ? "+" : "") + fmt(s.gain_db, 0) + " dB" : "",
+    restore: s.clip || s.click ? (s.clip ? "clipping" : "") + (s.clip && s.click ? ", " : "") + (s.click ? "clicks" : "") : "",
+    tones: s.tones ? "near " + Math.round(s.tone_hz / 50) * 50 + " Hz" : "",
     band: s.hp || s.lp ? (s.hp ? s.hp + " Hz" : "") + (s.hp && s.lp ? " – " : "") + (s.lp ? (s.lp / 1000).toFixed(1) + " kHz" : "") : "", eq: "",
   };
   BLOCKS.forEach(([k]) => { $("#now-" + k).textContent = now[k] || ""; });
 }
+
+/* ======================= hearing dose ======================= */
+function renderDose() {
+  const d = S.dose || 0, pct = Math.round(d * 100);
+  const bar = $("#doseBar"); bar.style.width = Math.min(100, d * 100) + "%";
+  bar.classList.toggle("warn", d >= 0.5 && d < 1); bar.classList.toggle("hot", d >= 1);
+  $("#doseTxt").innerHTML = `Today: <b>${pct} %</b> of the daily limit` + (d >= 1 ? " — limit reached: take a break or lower the volume" : "");
+  $("#doseNow").textContent = S.spl > 0 && S.out_db > -100 ? "now ≈ " + S.spl + " dB SPL" : "";
+}
+
+/* ======================= session log ======================= */
+const LOGKEY = "audita.log.v1";
+let logArch = [];
+try { logArch = JSON.parse(localStorage.getItem(LOGKEY) || "[]"); } catch (e) { logArch = []; }
+let logMax = logArch.reduce((m, e) => Math.max(m, e.s), 0), logBusy = false, timeSent = false, logShown = -1;
+function logSave() { try { localStorage.setItem(LOGKEY, JSON.stringify(logArch.slice(-20000))); } catch (e) { } }
+async function logSync() {
+  if (!S || logBusy || connState !== 2) return;
+  if (!timeSent && !S.time_ok) {
+    timeSent = true;
+    req("/api/time?t=" + Math.floor(Date.now() / 1000) + "&tz=" + (-new Date().getTimezoneOffset())).catch(() => { timeSent = false; });
+  }
+  if (S.log_next - 1 <= logMax) { if (logShown !== logArch.length) drawLog(); return; }
+  logBusy = true;
+  try {
+    for (let k = 0; k < 30; k++) {
+      const r = await req("/api/log?from=" + (logMax + 1) + "&n=40");
+      if (!r.e.length) break;
+      for (const e of r.e) {
+        const i = logArch.findIndex((x) => x.s === e.s);
+        if (i >= 0) logArch[i] = e; else logArch.push(e);
+        logMax = Math.max(logMax, e.s);
+      }
+      if (logMax >= r.next - 1) break;
+    }
+    logArch.sort((a, b) => a.s - b.s); logSave();
+  } catch (e) { }
+  logBusy = false;
+  drawLog();
+}
+const pad = (n) => String(n).padStart(2, "0");
+function when(e) {
+  if (!e.t) return { d: "time not set", h: "power-on " + e.b + ", +" + e.u + " s" };
+  const t = new Date(e.t * 1000);
+  return { d: t.getFullYear() + "-" + pad(t.getMonth() + 1) + "-" + pad(t.getDate()), h: pad(t.getHours()) + ":" + pad(t.getMinutes()) + ":" + pad(t.getSeconds()) };
+}
+function drawLog() {
+  logShown = logArch.length;
+  const list = logArch.slice(-300).reverse();
+  $("#logList").innerHTML = list.length ? list.map((e) => { const w = when(e);
+    return `<div><span class="tm"><b>${w.h}</b>${w.d}</span><span class="${e.x.startsWith("Note:") ? "nt" : ""}">${esc(e.x)}</span></div>`; }).join("")
+    : `<div class="empty">No events yet.</div>`;
+  $("#logInfo").textContent = `${logArch.length.toLocaleString("en")} events in this app. Kept also on Audita (about the last 1,000).`;
+}
+function logText(csv) {
+  const now = new Date(), tz = -now.getTimezoneOffset(), tzs = (tz >= 0 ? "+" : "−") + pad(Math.floor(Math.abs(tz) / 60)) + ":" + pad(Math.abs(tz) % 60);
+  if (csv) return "seq,power_on,seconds_after_power_on,date,time,event\n" + logArch.map((e) => { const w = when(e); return [e.s, e.b, e.u, e.t ? w.d : "", e.t ? w.h : "", '"' + e.x.replace(/"/g, '""') + '"'].join(","); }).join("\n") + "\n";
+  const w0 = when({ t: Math.floor(now / 1000) });
+  let t = "AUDITA - SESSION LOG\n" + "Device: " + (info ? info.name + " firmware " + info.ver : "Audita") + "\n" +
+    "Exported: " + w0.d + " " + w0.h + " (UTC" + tzs + ") with the Audita app 1.1\n" +
+    "Times: local time of the phone, set on Audita by the app. \"time not set\" = recorded before the app connected after power-on.\n\n";
+  t += "Seq     Date        Time      Event\n";
+  for (const e of logArch) { const w = when(e); t += String(e.s).padEnd(8) + (e.t ? w.d + "  " + w.h : ("time not set (" + w.h + ")").padEnd(20)) + "  " + e.x + "\n"; }
+  return t;
+}
+function fileStamp() { const d = new Date(); return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" + pad(d.getHours()) + pad(d.getMinutes()); }
+window.auSaved = (ok, msg) => toast(ok ? "Log saved (with SHA-256 fingerprint)" : "Not saved: " + msg);
+function saveLog(csv) {
+  if (!logArch.length) { toast("The log is empty"); return; }
+  const name = "audita-log-" + fileStamp() + (csv ? ".csv" : ".txt"), text = logText(csv);
+  if (hasBridge) AuditaBridge.saveText(name, csv ? "text/csv" : "text/plain", text);
+  else { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" })); a.download = name; a.click(); }
+}
+$("#logTxt").onclick = () => saveLog(false);
+$("#logCsv").onclick = () => saveLog(true);
+$("#logShare").onclick = () => { if (!logArch.length) { toast("The log is empty"); return; } if (hasBridge) AuditaBridge.shareText("Audita session log", logText(false)); else toast("Sharing works in the app"); };
+async function addNote() {
+  const v = $("#noteIn").value.trim();
+  if (!v) return;
+  try { await req("/api/note", v.slice(0, 40)); $("#noteIn").value = ""; toast("Note added"); logSync(); } catch (e) { toast("Note not added: " + e.message); }
+}
+$("#noteAdd").onclick = addNote;
+$("#noteIn").onkeydown = (e) => { if (e.key === "Enter") addNote(); };
 
 /* ======================= headphones ======================= */
 let curHeq = null;           // /api/heq (with filters)
@@ -693,7 +906,9 @@ function renderDevice() {
   if (!S) { $("#loadKv").innerHTML = ""; return; }
   $("#loadKv").innerHTML = kv("Audio processing", `<span class="mono">${(S.dsp_us / 1000).toFixed(1)} ms</span> (${Math.round(S.dsp_us / 100)} %)`) +
     kv("Neural network", `<span class="mono">${(S.rnn_us / 1000).toFixed(1)} ms</span>`) +
-    kv("Blocks late", `<span class="mono">${S.rnn_late}</span>`);
+    kv("Blocks late", `<span class="mono">${S.rnn_late}</span>`) +
+    kv("Sample rate", `<span class="mono">${S.fs / 1000} kHz</span>`) +
+    kv("Repaired samples", `<span class="mono">${(S.rclip + S.rclick).toLocaleString("en")}</span>`);
 }
 
 /* ======================= tabs ======================= */
@@ -704,6 +919,7 @@ $$("#tabs button").forEach((b) => b.onclick = () => {
   $$(".tab").forEach((t) => t.classList.toggle("on", t.id === "tab-" + curTab));
   window.scrollTo(0, 0);
   if (curTab === "phones" && !$("#idxNote").dataset.done) { $("#idxNote").dataset.done = 1; indexInfo(false); }
+  if (curTab === "log") drawLog();
   poll(true);
 });
 renderDetectEmpty();
@@ -713,9 +929,15 @@ function renderDetectEmpty() { $("#det").innerHTML = `<div><i class="dot"></i><s
 const Mock = {
   st: { usb: 3, src: "mono", out_mono: 1, ch: "auto", level: 1, bypass: 0, vol: -24, ceil: -3, ret: "proc", bw: "narrow", hum: 0, gsm: 1, hum_db: 0, gsm_db: -38,
     speech: 1, speech_db: -24, floor_db: -62, gain_db: 6, nr_db: -9.5, bwe: 1, hp: 60, lp: 7500, in_db: -26, out_db: -18, gr_db: 0, dsp_us: 4100, dn: 1, nn_vad: 0.8,
-    rnn_us: 2600, rnn_late: 0, rt60: 0.2, rt_n: 9, drv: 0, bwe_env: 1, ov: { band: "auto", hum: "auto", gsm: "auto", level: "auto", eq: "auto", denoise: "auto", bwe: "auto", dereverb: "auto" },
+    rnn_us: 2600, rnn_late: 0, rt60: 0.2, rt_n: 9, drv: 0, bwe_env: 1, ov: { band: "auto", hum: "auto", gsm: "auto", level: "auto", eq: "auto", denoise: "auto", bwe: "auto", dereverb: "auto", restore: "auto", tones: "auto" },
+    match: 1, keep: 0, shock: 1, sens: 110, lb: 1, match_db: 8.7, shock_db: 0, spl: 72, dose: 0.23, hiq: 0, fs: 48000, clip: 0, click: 1, rclip: 0, rclick: 1520,
+    tones: 1, tone_hz: 1012, log_next: 4, time_ok: 0, boot: 7,
     heq: { name: "", on: 0, n: 0, preamp: 0 } },
   heq: { name: "", on: 0, n: 0, preamp: 0, filters: [] },
+  log: [{ s: 1, b: 7, u: 0, t: 0, x: "Audita demo started: Medium, processing" }, { s: 2, b: 7, u: 3, t: 0, x: "Playback started" }, { s: 3, b: 7, u: 5, t: 0, x: "Clicks found: repairing" }],
+  t0: 0,
+  addLog(x) { const s = this.st; const up = Math.floor((Date.now() - this.boot0) / 1000); this.log.push({ s: s.log_next, b: s.boot, u: up, t: this.t0 ? this.t0 + up : 0, x }); s.log_next++; },
+  boot0: Date.now(),
   answer(id, code, obj, delay) { setTimeout(() => window.auResp(id, code, JSON.stringify(obj)), delay || 40); },
   connect() { window.auStatus(1, "Searching for Audita… (demo)"); setTimeout(() => window.auStatus(2, "Connected to Audita (demo)"), 500); },
   request(id, path, body) {
@@ -729,13 +951,20 @@ const Mock = {
     if (p === "/api/lset") {
       const k = a.get("k"), v = a.get("v");
       if (k === "vol") s.vol = Math.max(-60, Math.min(12, +v)); else if (k === "ceil") s.ceil = Math.max(-30, Math.min(0, +v));
-      else if (k === "ch") s.ch = v === "mono" ? "mono" : "auto"; else if (k === "level") s.level = +v; else if (k === "bypass") s.bypass = +v ? 1 : 0;
+      else if (k === "ch") s.ch = ["mono", "left", "right"].includes(v) ? v : "auto"; else if (k === "level") s.level = +v; else if (k === "bypass") s.bypass = +v ? 1 : 0;
       else if (k === "ret") s.ret = v === "out" ? "out" : "proc"; else if (k === "dn") s.dn = +v; else if (k === "bweenv") s.bwe_env = +v ? 1 : 0;
       else if (k && k.startsWith("ov.") && k.slice(3) in s.ov && ["auto", "on", "off"].includes(v)) s.ov[k.slice(3)] = v;
+      else if (["match", "keep", "shock", "lb"].includes(k)) s[k] = +v ? 1 : 0;
+      else if (k === "sens") s.sens = Math.max(80, Math.min(140, +v));
+      else if (k === "hiq") { const on = +v ? 1 : 0; this.answer(id, 200, { ok: 1, restart: 1 }); setTimeout(() => { window.auStatus(0, "Disconnected"); setTimeout(() => { s.hiq = on; s.fs = on ? 96000 : 48000; this.addLog(on ? "Audita demo started: 96 kHz, bypass only" : "Audita demo started: Medium, processing"); window.auStatus(2, "Connected to Audita (demo)"); }, 900); }, 300); return; }
       else return this.answer(id, 400, { err: "unknown key" });
       return this.answer(id, 200, { ok: 1 });
     }
     if (p === "/api/heq") return this.answer(id, 200, this.heq);
+    if (p === "/api/time") { this.t0 = +a.get("t") - Math.floor((Date.now() - this.boot0) / 1000); s.time_ok = 1; this.addLog("Clock set by the app"); return this.answer(id, 200, { ok: 1 }); }
+    if (p === "/api/log") { const f = +a.get("from") || 1, n = Math.min(40, +a.get("n") || 30); const e = this.log.filter((x) => x.s >= f).slice(0, n).map((x) => Object.assign({}, x, { t: x.t || (this.t0 ? this.t0 + x.u : 0) })); return this.answer(id, 200, { boot: s.boot, up: 9, next: s.log_next, tz: 60, e }); }
+    if (p === "/api/note") { if (!body) return this.answer(id, 400, { err: "send the note as body" }); this.addLog("Note: " + body.slice(0, 40)); return this.answer(id, 200, { ok: 1 }); }
+    if (p === "/api/dosereset") { s.dose = 0; this.addLog("Hearing dose reset by the user"); return this.answer(id, 200, { ok: 1 }); }
     if (p === "/api/heqset") {
       const r = parseApo(body); if (r.err) return this.answer(id, 400, { err: r.err });
       this.heq = { name: a.get("name") || "Custom", on: 1, n: r.filters.length, preamp: r.preamp, filters: r.filters };

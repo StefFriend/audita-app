@@ -15,6 +15,11 @@ what Audita is doing and for fine tuning.
 - **Headphones**: search the [AutoEq](https://github.com/jaakkopasanen/AutoEq) database (about 8,800 profiles),
   preview the correction curve and load it into Audita; or load any Equalizer APO `ParametricEQ.txt` file
   (up to 12 filters). The profile is stored on Audita and stays active without the phone.
+- **Log**: the session log for the expert report: what Audita detected and every change of settings, with the time,
+  plus your own notes. Kept on Audita (about the last 1,000 events) and in the app; saved as text or CSV with a
+  SHA-256 fingerprint of its content.
+- **Hearing protection**: estimated daily dose (80 dB for 8 hours = 100 %), sound level now, shock guard against bangs.
+- **96 kHz mode**: playback of high-resolution files without processing (Audita restarts to change mode).
 - **Device**: firmware, USB audio state, processing load.
 
 The UI follows the phone's light or dark theme.
@@ -38,6 +43,13 @@ optional body; the answer is `"<id> <status>\n"` followed by JSON. One request a
 | `/api/heq` | loaded headphone profile with its filters |
 | `/api/heqset?name=…` | body: `ParametricEQ.txt` text; checks, applies and stores it |
 | `/api/heqon?v=0\|1`, `/api/heqdel` | correction on/off, remove profile |
+| `/api/time?t=<unix>&tz=<min>` | phone clock, for the log and the daily dose |
+| `/api/log?from=<seq>&n=<max>` | session log entries (up to 40 per request) |
+| `/api/note` | body: a note (up to 40 characters) added to the log |
+| `/api/dosereset` | resets today's hearing dose |
+
+More `lset` keys: `ch` also `left` / `right`; `match`, `keep`, `shock`, `lb` (0/1); `sens` (dB SPL at full scale, 80–140);
+`hiq` (1 = 96 kHz playback only, Audita restarts); `ov.restore`, `ov.tones`.
 
 The same API answers on the board's serial port (`api /api/lstate`), which is how it is tested.
 

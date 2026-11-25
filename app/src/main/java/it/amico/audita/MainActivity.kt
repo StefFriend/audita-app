@@ -53,6 +53,7 @@ class MainActivity : Activity() {
         const val DEVICE_NAME = "Audita"
         const val REQ_PERM = 1
         const val REQ_FILE = 2
+        const val REQ_SAVE = 3
         const val ST_OFF = 0
         const val ST_BUSY = 1
         const val ST_READY = 2
@@ -80,6 +81,13 @@ class MainActivity : Activity() {
     private val resp = ByteArrayOutputStream()
     private var fileCb: ValueCallback<Array<Uri>>? = null
     private lateinit var autoEq: AutoEq
+    private var pendingSave: String? = null
+
+    private fun withDigest(text: String): String {
+        val body = if (text.endsWith("\n")) text else text + "\n"
+        val d = java.security.MessageDigest.getInstance("SHA-256").digest(body.toByteArray(Charsets.UTF_8))
+        return body + "\nSHA-256 of the text above: " + d.joinToString("") { "%02x".format(it) } + "\n"
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -108,6 +116,17 @@ class MainActivity : Activity() {
 
     @Deprecated("system API")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQ_SAVE) {
+            val u = if (resultCode == RESULT_OK) data?.data else null
+            val text = pendingSave
+            pendingSave = null
+            if (u == null || text == null) { js("window.auSaved && window.auSaved(false, 'not saved')"); return }
+            try {
+                contentResolver.openOutputStream(u)?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+                js("window.auSaved && window.auSaved(true, 'saved')")
+            } catch (e: Exception) { js("window.auSaved && window.auSaved(false, ${JSONObject.quote(e.message ?: "error")})") }
+            return
+        }
         if (requestCode == REQ_FILE) {
             val u = if (resultCode == RESULT_OK) data?.data else null
             fileCb?.onReceiveValue(if (u != null) arrayOf(u) else null)
@@ -155,6 +174,20 @@ class MainActivity : Activity() {
         @JavascriptInterface fun eqSearch(id: Int, query: String) = autoEq.search(id, query)
         @JavascriptInterface fun eqProfile(id: Int, path: String, name: String) = autoEq.profile(id, path, name)
         @JavascriptInterface fun eqIndexInfo(id: Int, refresh: Boolean) = autoEq.info(id, refresh)
+        /* registro della sessione: il testo riceve in coda l'impronta SHA-256 delle righe, poi si sceglie dove salvarlo */
+        @JavascriptInterface fun saveText(name: String, mime: String, text: String) {
+            ui.post {
+                pendingSave = withDigest(text)
+                val i = Intent(Intent.ACTION_CREATE_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = mime; putExtra(Intent.EXTRA_TITLE, name) }
+                try { startActivityForResult(i, REQ_SAVE) } catch (e: Exception) { pendingSave = null; js("window.auSaved && window.auSaved(false, 'no file app')") }
+            }
+        }
+        @JavascriptInterface fun shareText(subject: String, text: String) {
+            ui.post {
+                val i = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_SUBJECT, subject); putExtra(Intent.EXTRA_TEXT, withDigest(text)) }
+                try { startActivity(Intent.createChooser(i, subject)) } catch (e: Exception) { }
+            }
+        }
     }
 
     @Suppress("DEPRECATION")
